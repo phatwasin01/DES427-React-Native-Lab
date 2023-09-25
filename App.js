@@ -1,105 +1,158 @@
 import React, { Component } from "react";
+
 import {
-  AppRegistry,
+  Platform,
   StyleSheet,
   Text,
   View,
-  TextInput,
   TouchableOpacity,
+  Dimensions,
+  Switch,
 } from "react-native";
 
-export default class BMI extends Component {
+import { LineChart } from "react-native-chart-kit";
+
+import StockButton from "./StockButton.js";
+
+import API from "./api.js";
+
+const chartConfig = {
+  backgroundGradientFrom: "#1E2923",
+  backgroundGradientTo: "#08130D",
+  color: (opacity = 1) => `rgba(26, 255, 146, ${opacity})`, // color of background
+  strokeWidth: 2, // optional, default 3
+};
+
+export default class Stocks extends Component {
   constructor(props) {
     super(props);
-    this.state = { weight: "0", height: "0", bmi: 0, color: "black" };
-    // this.compute = this.compute.bind(this);
-    // if we use arrow function for compute() below
-    // we don't need the above line
-    // we can alternatively use arrow function in render
+    this.changeIndex = this.changeIndex.bind(this);
+    this.state = {
+      dates: ["01/01", "02/01", "03/01", "04/01", "05/01", "06/01", "07/01"],
+      prices: [1, 2, 3, 4, 5, 6, 7],
+      stockname: "Choose a stock",
+      switch: false,
+    };
+
+    // this.data = {
+    //   labels: this.state.dates,
+    //   datasets: [{
+    //     data: this.state.prices,
+    //     color: (opacity = 1) => `rgba(134, 65, 244, ${opacity})`, // colar of the line
+    //     strokeWidth: 2 // optional
+    //   }]
+    // }
   }
 
-  compute = () => {
-    console.log("On pressed!");
-    let weight = parseFloat(this.state.weight);
-    let height = parseFloat(this.state.height);
-    let bmiValue = weight / Math.pow(height / 100, 2);
-    if (bmiValue < 18.5) {
-      this.setState({ color: "orange" });
-    } else if (bmiValue < 24.9) {
-      this.setState({ color: "green" });
-    } else if (bmiValue < 29.9) {
-      this.setState({ color: "yellow" });
-    } else {
-      this.setState({ color: "red" });
-    }
-    this.setState({ bmi: bmiValue });
-  };
-  // if use arrow function in render, we don't have to
-  // bind in constructor
+  changeIndex(stockCode, stockName) {
+    console.log(stockCode, stockName);
+    API(stockCode, this.state.switch).then((stock) => {
+      let keyTimeSeries = this.state.switch
+        ? "Weekly Time Series"
+        : "Time Series (Daily)";
+      // console.log(stock);
+      let datesArray = Object.keys(stock[keyTimeSeries]).slice(0, 6);
+      let closingPrice = [];
+      datesArray.forEach((day) => {
+        closingPrice.push(stock[keyTimeSeries][day]["4. close"]);
+      });
+      let datesArrayRev = datesArray.reverse();
+      let datesNotincludeYear = datesArrayRev.map((date) => {
+        let [year, month, day] = date.split("-");
+        return `${day}/${month}`;
+      });
+      console.log(datesArray);
+      console.log(closingPrice);
+      console.log(datesArrayRev);
+      this.setState({
+        dates: datesNotincludeYear,
+        prices: closingPrice,
+        stockname: stockName,
+      });
+    });
+  }
+
   render() {
+    let message;
+    if (this.state.switch) {
+      message = "Weekly";
+    } else {
+      message = "Daily";
+    }
     return (
       <View style={styles.container}>
-        <View style={styles.group}>
-          <Text style={styles.title}>Weight (KG)</Text>
-          <TextInput
-            style={styles.input}
-            keyboardType="numeric"
-            value={this.state.weight}
-            onChangeText={(weight) => this.setState({ weight })}
+        <View style={styles.header}>
+          <Text>{this.state.stockname}</Text>
+          <LineChart
+            data={{
+              labels: this.state.dates,
+              datasets: [
+                {
+                  data: this.state.prices,
+                  color: (opacity = 1) => `rgba(134, 65, 244, ${opacity})`, // colar of the line
+                  strokeWidth: 2, // optional
+                },
+              ],
+            }}
+            width={Dimensions.get("window").width}
+            height={220}
+            chartConfig={chartConfig}
+            style={{ paddingVertical: 10 }}
           />
         </View>
-        <View style={styles.group}>
-          <Text style={styles.title}>Height (CM)</Text>
-          <TextInput
-            style={styles.input}
-            keyboardType="numeric"
-            value={this.state.height}
-            onChangeText={(height) => this.setState({ height })}
-          />
+        <View style={styles.footer}>
+          <StockButton code="AAPL" name="Apple" onPress={this.changeIndex} />
+          <StockButton code="GOOGL" name="Google" onPress={this.changeIndex} />
+          <StockButton code="UBER" name="Uber" onPress={this.changeIndex} />
         </View>
-        <View style={styles.center}>
-          <View style={styles.group}>
-            <Text style={{ ...styles.title, color: this.state.color }}>
-              BMI: {this.state.bmi.toFixed(2)}
-            </Text>
-          </View>
-          <View style={styles.group}>
-            <TouchableOpacity style={styles.button} onPress={this.compute}>
-              <Text style={styles.buttonText}>Compute</Text>
-            </TouchableOpacity>
-          </View>
+        <View style={styles.switchContainer}>
+          <Text style={{ fontSize: 30 }}>{message}</Text>
+          <Switch
+            onValueChange={() => {
+              this.setState({
+                switch: !this.state.switch,
+              });
+            }}
+            value={this.state.switch}
+          />
         </View>
       </View>
     );
   }
 }
+
 const styles = StyleSheet.create({
-  container: {
+  switchContainer: {
     flex: 1,
     justifyContent: "center",
-    flexDirection: "column",
-    padding: 20,
+    alignItems: "center",
+    backgroundColor: "#F5FCFF",
   },
-  group: {
-    marginTop: 20,
+  container: {
+    flex: 1,
+  },
+  header: {
+    flex: 2,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "yellow",
+  },
+  footer: {
+    flex: 1,
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "center",
+    justifyContent: "space-evenly",
+    backgroundColor: "pink",
   },
   button: {
-    backgroundColor: "lightblue",
-    padding: 20,
+    margin: 10,
     borderWidth: 1,
-  },
-  buttonText: {
-    fontSize: 30,
-  },
-  input: {
-    padding: 10,
-    height: 40,
-    borderWidth: 1,
-  },
-  title: {
-    fontSize: 20,
-  },
-  center: {
+    width: 100,
+    height: 50,
+    borderRadius: 10,
+    justifyContent: "center",
     alignItems: "center",
+    backgroundColor: "lightgray",
   },
 });
