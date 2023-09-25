@@ -1,158 +1,232 @@
-import React, { Component } from "react";
-
+import React from "react";
 import {
-  Platform,
-  StyleSheet,
-  Text,
+  Button,
   View,
-  TouchableOpacity,
-  Dimensions,
-  Switch,
+  Text,
+  TouchableHighlight,
+  StyleSheet,
+  FlatList,
+  Image,
+  TextInput,
 } from "react-native";
+import { NavigationContainer } from "@react-navigation/native";
+import { createStackNavigator } from "@react-navigation/stack";
 
-import { LineChart } from "react-native-chart-kit";
-
-import StockButton from "./StockButton.js";
+import Toast, { DURATION } from "react-native-easy-toast";
 
 import API from "./api.js";
 
-const chartConfig = {
-  backgroundGradientFrom: "#1E2923",
-  backgroundGradientTo: "#08130D",
-  color: (opacity = 1) => `rgba(26, 255, 146, ${opacity})`, // color of background
-  strokeWidth: 2, // optional, default 3
-};
+var NUM_MOVIES = 5; // number of movies to display on the list screen
 
-export default class Stocks extends Component {
-  constructor(props) {
-    super(props);
-    this.changeIndex = this.changeIndex.bind(this);
+class ListScreen extends React.Component {
+  constructor() {
+    super();
+    this.loadMovie = this.loadMovie.bind(this);
     this.state = {
-      dates: ["01/01", "02/01", "03/01", "04/01", "05/01", "06/01", "07/01"],
-      prices: [1, 2, 3, 4, 5, 6, 7],
-      stockname: "Choose a stock",
-      switch: false,
+      title: "",
+      listData: Array(5).fill(null),
     };
-
-    // this.data = {
-    //   labels: this.state.dates,
-    //   datasets: [{
-    //     data: this.state.prices,
-    //     color: (opacity = 1) => `rgba(134, 65, 244, ${opacity})`, // colar of the line
-    //     strokeWidth: 2 // optional
-    //   }]
-    // }
   }
 
-  changeIndex(stockCode, stockName) {
-    console.log(stockCode, stockName);
-    API(stockCode, this.state.switch).then((stock) => {
-      let keyTimeSeries = this.state.switch
-        ? "Weekly Time Series"
-        : "Time Series (Daily)";
-      // console.log(stock);
-      let datesArray = Object.keys(stock[keyTimeSeries]).slice(0, 6);
-      let closingPrice = [];
-      datesArray.forEach((day) => {
-        closingPrice.push(stock[keyTimeSeries][day]["4. close"]);
+  loadMovie(title) {
+    API(title)
+      .then((data) => {
+        if (!data || !data.results || data.results.length == 0) {
+          this.toast.show("Error: No data returned", 2000);
+          return;
+        }
+        let movies = data.results; // array of movies
+        movies = movies.slice(0, NUM_MOVIES); // Take only the first NUM_MOVIES movies
+        const listData = this.state.listData.slice();
+        for (let i = 0; i < NUM_MOVIES; i++) listData[i] = movies[i];
+        this.setState({
+          listData: listData,
+        });
+      })
+      .catch((error) => {
+        this.toast.show("Error: " + error.message, 2000);
       });
-      let datesArrayRev = datesArray.reverse();
-      let datesNotincludeYear = datesArrayRev.map((date) => {
-        let [year, month, day] = date.split("-");
-        return `${day}/${month}`;
-      });
-      console.log(datesArray);
-      console.log(closingPrice);
-      console.log(datesArrayRev);
-      this.setState({
-        dates: datesNotincludeYear,
-        prices: closingPrice,
-        stockname: stockName,
-      });
-    });
   }
 
   render() {
-    let message;
-    if (this.state.switch) {
-      message = "Weekly";
-    } else {
-      message = "Daily";
+    let pic = {
+      uri: "https://image.tmdb.org/t/p/w200/jIjdFXKUNtdf1bwqMrhearpyjMj.jpg",
+    };
+    const listData = this.state.listData.slice();
+    // show this at when the app first loads
+    let dataToShow = [
+      { key: "Movie 1", imgSource: require("./image_not_found.png") },
+      { key: "Movie 2", imgSource: require("./image_not_found.png") },
+      { key: "Movie 3", imgSource: require("./image_not_found.png") },
+      { key: "Movie 4", imgSource: require("./image_not_found.png") },
+      { key: "Movie 5", imgSource: require("./image_not_found.png") },
+    ];
+    // api call successful, listData is not null array
+    if (listData[0] !== null) {
+      dataToShow = [];
+      for (let k = 0; k < NUM_MOVIES; k++) {
+        let imgURI = "https://image.tmdb.org/t/p/w200/";
+        imgURI += listData[k].poster_path;
+        new_obj = {
+          key: listData[k].title,
+          imgSource: { uri: imgURI },
+          vote_average: listData[k].vote_average,
+          overview: listData[k].overview,
+          release_date: listData[k].release_date,
+        };
+        dataToShow.push(new_obj);
+      }
     }
+
     return (
-      <View style={styles.container}>
-        <View style={styles.header}>
-          <Text>{this.state.stockname}</Text>
-          <LineChart
-            data={{
-              labels: this.state.dates,
-              datasets: [
-                {
-                  data: this.state.prices,
-                  color: (opacity = 1) => `rgba(134, 65, 244, ${opacity})`, // colar of the line
-                  strokeWidth: 2, // optional
-                },
-              ],
+      <View style={{ padding: 20 }}>
+        <View style={{ flexDirection: "row" }}>
+          <TextInput
+            style={styles.input}
+            onChangeText={(text) => {
+              this.setState({ title: text });
             }}
-            width={Dimensions.get("window").width}
-            height={220}
-            chartConfig={chartConfig}
-            style={{ paddingVertical: 10 }}
+          />
+          <Button
+            title="Search"
+            onPress={() => {
+              this.loadMovie(this.state.title);
+            }}
           />
         </View>
-        <View style={styles.footer}>
-          <StockButton code="AAPL" name="Apple" onPress={this.changeIndex} />
-          <StockButton code="GOOGL" name="Google" onPress={this.changeIndex} />
-          <StockButton code="UBER" name="Uber" onPress={this.changeIndex} />
+        <Text style={{ fontSize: 30 }}>List Screen</Text>
+        <FlatList
+          data={dataToShow}
+          renderItem={({ item }) => {
+            return (
+              <TouchableHighlight
+                onPress={() => {
+                  this.props.navigation.navigate("Details", {
+                    movieName: item.key,
+                    poster: item.imgSource,
+                    vote_average: item.vote_average,
+                    overview: item.overview,
+                    release_date: item.release_date,
+                  });
+                }}
+              >
+                <View style={styles.row}>
+                  <Image style={styles.image} source={item.imgSource} />
+                  <Text style={styles.title}>{item.key}</Text>
+                </View>
+              </TouchableHighlight>
+            );
+          }}
+        />
+        <Toast
+          ref={(toast) => (this.toast = toast)}
+          style={{ backgroundColor: "red" }}
+          position="bottom"
+          positionValue={300}
+          fadeInDuration={750}
+          fadeOutDuration={1000}
+          opacity={0.8}
+          textStyle={{ color: "white" }}
+        />
+      </View>
+    );
+  }
+}
+
+class DetailsScreen extends React.Component {
+  render() {
+    const { movieName, poster, vote_average, overview, release_date } =
+      this.props.route.params;
+
+    return (
+      <View style={{ padding: 20, flexDirection: "row" }}>
+        <View style={{ flex: 2 }}>
+          <Image style={styles.image} source={poster} />
+          <Text> Rating: {vote_average} </Text>
         </View>
-        <View style={styles.switchContainer}>
-          <Text style={{ fontSize: 30 }}>{message}</Text>
-          <Switch
-            onValueChange={() => {
-              this.setState({
-                switch: !this.state.switch,
-              });
-            }}
-            value={this.state.switch}
+        <View style={{ flex: 3, padding: 10 }}>
+          <Text style={{ fontSize: 20 }}> {movieName} </Text>
+          <View
+            style={{ height: 1, backgroundColor: "lightgray", margin: 5 }}
           />
+          <Text> Released on: {release_date} </Text>
+          <View
+            style={{ height: 1, backgroundColor: "lightgray", margin: 5 }}
+          />
+          <Text> Plot: {overview} </Text>
         </View>
       </View>
     );
   }
 }
 
+const Stack = createStackNavigator();
+
+export default class App extends React.Component {
+  render() {
+    return (
+      <NavigationContainer>
+        <Stack.Navigator initialRouteName="Home">
+          <Stack.Screen
+            name="Home"
+            component={ListScreen}
+            options={{
+              title: "Movie Explorer",
+              headerStyle: {
+                backgroundColor: "darkred",
+              },
+              headerTintColor: "#fff",
+              headerTitleStyle: {
+                fontWeight: "bold",
+              },
+            }}
+          />
+          <Stack.Screen
+            name="Details"
+            component={DetailsScreen}
+            options={{
+              title: "Movie Explorer",
+              headerStyle: {
+                backgroundColor: "darkred",
+              },
+              headerTintColor: "#fff",
+              headerTitleStyle: {
+                fontWeight: "bold",
+              },
+            }}
+          />
+        </Stack.Navigator>
+      </NavigationContainer>
+    );
+  }
+}
+
 const styles = StyleSheet.create({
-  switchContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "#F5FCFF",
-  },
   container: {
     flex: 1,
-  },
-  header: {
-    flex: 2,
     justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "yellow",
+    flexDirection: "column",
+    padding: 20,
   },
-  footer: {
-    flex: 1,
+  row: {
     flexDirection: "row",
-    flexWrap: "wrap",
-    alignItems: "center",
-    justifyContent: "space-evenly",
-    backgroundColor: "pink",
+    height: 100,
+    flex: 1,
   },
-  button: {
-    margin: 10,
+  image: {
+    height: 100,
+    flex: 2,
+  },
+  title: {
+    fontSize: 20,
+    flex: 5,
+    padding: 20,
     borderWidth: 1,
-    width: 100,
-    height: 50,
-    borderRadius: 10,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "lightgray",
+  },
+  input: {
+    height: 40,
+    width: 250,
+    borderWidth: 1,
+    padding: 10,
   },
 });
