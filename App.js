@@ -1,120 +1,148 @@
 import React, { Component } from "react";
-
 import {
   Platform,
   StyleSheet,
   Text,
   View,
-  TouchableOpacity,
   Dimensions,
-  Switch,
+  Button,
+  Image,
 } from "react-native";
 
-import { LineChart } from "react-native-chart-kit";
+import MapView from "react-native-maps";
+import { Marker } from "react-native-maps"; // https://github.com/react-native-maps/react-native-maps/issues/4544#issuecomment-1336477217
+import { Callout } from "react-native-maps";
 
-import StockButton from "./StockButton.js";
+var { width, height } = Dimensions.get("window");
 
-import API from "./api.js";
-
-const chartConfig = {
-  backgroundGradientFrom: "#1E2923",
-  backgroundGradientTo: "#08130D",
-  color: (opacity = 1) => `rgba(26, 255, 146, ${opacity})`, // color of background
-  strokeWidth: 2, // optional, default 3
-};
-
-export default class Stocks extends Component {
+export default class App extends Component {
   constructor(props) {
     super(props);
-    this.changeIndex = this.changeIndex.bind(this);
     this.state = {
-      dates: ["01/01", "02/01", "03/01", "04/01", "05/01", "06/01", "07/01"],
-      prices: [1, 2, 3, 4, 5, 6, 7],
-      stockname: "Choose a stock",
-      switch: false,
+      region: {
+        latitude: 13.764884,
+        longitude: 100.538265,
+        latitudeDelta: 0.005,
+        longitudeDelta: 0.005,
+      },
+      markerRefs: [],
+      markers: [
+        {
+          latlng: { latitude: 13.764884, longitude: 100.538265 },
+          title: "Victory Monument",
+          image: require("./images/attention.png"),
+          description: "A large military monument in Bangkok, Thailand.",
+          photo: require("./images/Victory_Monument.jpg"),
+        },
+        {
+          latlng: { latitude: 13.763681, longitude: 100.538125 },
+          title: "Saxophone Club",
+          image: require("./images/music.png"),
+          description: "A music pub for saxophone lover",
+          photo: require("./images/Saxophone.jpg"),
+        },
+        {
+          latlng: { latitude: 13.764595, longitude: 100.537438 },
+          title: "COCO Department Store",
+          image: require("./images/shopping.png"),
+          description: "A fashion department store",
+          photo: require("./images/coco.jpg"),
+        },
+      ],
     };
-
-    // this.data = {
-    //   labels: this.state.dates,
-    //   datasets: [{
-    //     data: this.state.prices,
-    //     color: (opacity = 1) => `rgba(134, 65, 244, ${opacity})`, // colar of the line
-    //     strokeWidth: 2 // optional
-    //   }]
-    // }
+    this.onRegionChangeComplete = this.onRegionChangeComplete.bind(this);
+    this.moveMaptoLocation = this.moveMaptoLocation.bind(this);
   }
 
-  changeIndex(stockCode, stockName) {
-    console.log(stockCode, stockName);
-    API(stockCode, this.state.switch).then((stock) => {
-      let keyTimeSeries = this.state.switch
-        ? "Weekly Time Series"
-        : "Time Series (Daily)";
-      // console.log(stock);
-      let datesArray = Object.keys(stock[keyTimeSeries]).slice(0, 6);
-      let closingPrice = [];
-      datesArray.forEach((day) => {
-        closingPrice.push(stock[keyTimeSeries][day]["4. close"]);
-      });
-      let datesArrayRev = datesArray.reverse();
-      let datesNotincludeYear = datesArrayRev.map((date) => {
-        let [year, month, day] = date.split("-");
-        return `${day}/${month}`;
-      });
-      console.log(datesArray);
-      console.log(closingPrice);
-      console.log(datesArrayRev);
-      this.setState({
-        dates: datesNotincludeYear,
-        prices: closingPrice,
-        stockname: stockName,
-      });
-    });
+  onRegionChangeComplete(region) {
+    this.setState({ region });
+  }
+
+  moveMaptoLocation(region) {
+    console.log(region);
+    this.setState({ region });
+    //sleep for 0.1 sec
+
+    setTimeout(() => {
+      const indexRegion = this.state.markers.findIndex(
+        (marker) =>
+          marker.latlng.latitude === region.latitude &&
+          marker.latlng.longitude === region.longitude
+      );
+      this.state.markerRefs[indexRegion].showCallout();
+    }, 100);
   }
 
   render() {
-    let message;
-    if (this.state.switch) {
-      message = "Weekly";
-    } else {
-      message = "Daily";
-    }
     return (
       <View style={styles.container}>
-        <View style={styles.header}>
-          <Text>{this.state.stockname}</Text>
-          <LineChart
-            data={{
-              labels: this.state.dates,
-              datasets: [
-                {
-                  data: this.state.prices,
-                  color: (opacity = 1) => `rgba(134, 65, 244, ${opacity})`, // colar of the line
-                  strokeWidth: 2, // optional
-                },
-              ],
-            }}
-            width={Dimensions.get("window").width}
-            height={220}
-            chartConfig={chartConfig}
-            style={{ paddingVertical: 10 }}
-          />
-        </View>
-        <View style={styles.footer}>
-          <StockButton code="AAPL" name="Apple" onPress={this.changeIndex} />
-          <StockButton code="GOOGL" name="Google" onPress={this.changeIndex} />
-          <StockButton code="UBER" name="Uber" onPress={this.changeIndex} />
-        </View>
-        <View style={styles.switchContainer}>
-          <Text style={{ fontSize: 30 }}>{message}</Text>
-          <Switch
-            onValueChange={() => {
-              this.setState({
-                switch: !this.state.switch,
-              });
-            }}
-            value={this.state.switch}
-          />
+        <MapView
+          style={styles.map}
+          region={this.state.region}
+          onRegionChangeComplete={this.onRegionChangeComplete}
+        >
+          {/* https://github.com/react-native-maps/react-native-maps/issues/4544#issuecomment-1336477217 */}
+          {this.state.markers.map((marker, i) => {
+            return (
+              <Marker
+                key={i}
+                coordinate={marker.latlng}
+                title={marker.title}
+                description={marker.description}
+                image={marker.image}
+                ref={(ref) => (this.state.markerRefs[i] = ref)}
+              >
+                <Callout>
+                  <View style={styles.callout}>
+                    <Image style={styles.calloutPhoto} source={marker.photo} />
+                    <Text style={styles.calloutTitle}>{marker.title}</Text>
+                    <Text>{marker.description}</Text>
+                  </View>
+                </Callout>
+              </Marker>
+            );
+          })}
+        </MapView>
+        <View style={styles.container}>
+          <View style={{ padding: 5 }}>
+            <Button
+              title="Victory Monument"
+              onPress={() =>
+                this.moveMaptoLocation({
+                  latitude: 13.764884,
+                  longitude: 100.538265,
+                  latitudeDelta: 0.002,
+                  longitudeDelta: 0.002,
+                })
+              }
+            />
+          </View>
+          <View style={{ padding: 5 }}>
+            <Button
+              title="Saxophone Club"
+              onPress={() =>
+                this.moveMaptoLocation({
+                  latitude: 13.763681,
+                  longitude: 100.538125,
+                  latitudeDelta: 0.002,
+                  longitudeDelta: 0.002,
+                })
+              }
+            />
+          </View>
+          <View style={{ padding: 5 }}>
+            <Button
+              title="Coco Department Store"
+              onPress={() =>
+                this.moveMaptoLocation({
+                  latitude: 13.764595,
+                  longitude: 100.537438,
+                  latitudeDelta: 0.002,
+                  longitudeDelta: 0.002,
+                })
+              }
+            />
+          </View>
         </View>
       </View>
     );
@@ -122,37 +150,29 @@ export default class Stocks extends Component {
 }
 
 const styles = StyleSheet.create({
-  switchContainer: {
+  container: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
     backgroundColor: "#F5FCFF",
   },
-  container: {
+  map: {
+    width: width,
+    height: Math.floor((height * 2) / 3),
+  },
+  callout: {
     flex: 1,
+    paddingRight: 10,
+    paddingBottom: 10,
+    marginRight: 10,
+    marginBottom: 10,
   },
-  header: {
-    flex: 2,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "yellow",
-  },
-  footer: {
+  calloutPhoto: {
     flex: 1,
-    flexDirection: "row",
-    flexWrap: "wrap",
-    alignItems: "center",
-    justifyContent: "space-evenly",
-    backgroundColor: "pink",
+    width: 166,
+    height: 83,
   },
-  button: {
-    margin: 10,
-    borderWidth: 1,
-    width: 100,
-    height: 50,
-    borderRadius: 10,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "lightgray",
+  calloutTitle: {
+    fontSize: 16,
   },
 });
